@@ -311,8 +311,6 @@ NC='\033[0m'
 
 echo -e "${GREEN}==> Block 10: enabling passwordless sudo for ${USER}...${NC}"
 echo "${USER} ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/"${USER}"-nopasswd
-sudo chmod 0440 /etc/sudoers.d/"${USER}"-nopasswd
-sudo visudo -cf /etc/sudoers.d/"${USER}"-nopasswd
 
 
 # ============================================================
