@@ -2,7 +2,7 @@
 
 ## Summary
 
-Tailscale and WARP can run together on this Mac. Excluding the tailnet and its subnet routes from WARP was insufficient: Tailscale's public relay/control connections also needed to bypass WARP. Adding the current Singapore DERP relay IPv4 addresses and `controlplane.tailscale.com` restored simultaneous connectivity.
+Tailscale and WARP can run together on this Mac with WARP in **Traffic and DNS** mode. Two conflicts had to be resolved: Tailscale's public relay/control connections needed to bypass WARP, and WARP needed to own the default DNS resolver. MagicDNS remains available through a macOS resolver scoped only to the tailnet domain.
 
 Tested on September 10, 2026:
 
@@ -13,7 +13,7 @@ Tested on September 10, 2026:
 | WARP | 2026.7.1376.0, MASQUE |
 | WARP mode | `warp` — tunnel plus DNS proxy |
 | Split tunnels | Exclude mode |
-| Tailscale DNS | Enabled |
+| Tailscale DNS | Global DNS injection disabled; MagicDNS configured as a scoped macOS resolver |
 | Tailscale exit node | None |
 
 ## Symptom and root cause
@@ -28,7 +28,9 @@ The existing WARP exclusions already included:
 
 These cover the **inner destination addresses**, but a relayed Tailscale connection also needs an **outer connection to a public DERP server**. Those public addresses were still routed through WARP. Tailscale logs showed connection refusals to public bootstrap/relay servers and failures reaching its control plane while WARP was enabled.
 
-The successful exclusion test identifies public transport reachability as the configuration gap. It does not establish the precise internal WARP/macOS filtering mechanism. The relay and control exclusions were added together, so their individual necessity was not tested separately.
+The relay exclusions restored Tailscale peer connectivity, but WARP could still stall at 91% and report `CF_DNS_LOOKUP_FAILURE`. Its log showed repeated failures resolving the internal health-check name `connectivity-check.warp-svc.` while Tailscale controlled the system DNS configuration. Letting WARP own default DNS cleared that health check. A resolver scoped to the tailnet suffix preserved MagicDNS without making Tailscale a second default DNS owner.
+
+The relay and control exclusions were added together, so their individual necessity was not tested separately.
 
 ## Fix
 
@@ -40,6 +42,7 @@ warp-cli tunnel ip add 172.237.66.30
 warp-cli tunnel ip add 172.237.72.79
 warp-cli tunnel ip add 172.237.72.43
 warp-cli tunnel host add controlplane.tailscale.com
+tailscale set --accept-dns=false
 warp-cli connect
 ```
 
@@ -54,7 +57,18 @@ These were the four Singapore relay addresses returned by the local Tailscale DE
 
 The local CLI labels these mutation commands as consumer-only. For an organization-managed client, configure the corresponding exclusions in the applicable device profile.
 
-The final working configuration retained `warp` mode and Tailscale DNS. Switching WARP to `tunnel_only` was tested separately and **did not fix the peer timeout**; DNS contention alone did not explain this failure.
+Create a macOS resolver for the tailnet's full DNS suffix. Find the suffix with `tailscale status` or the Tailscale admin console, then replace `YOUR-TAILNET.ts.net` below:
+
+```sh
+sudo mkdir -p /etc/resolver
+printf 'nameserver 100.100.100.100\n' | sudo tee /etc/resolver/YOUR-TAILNET.ts.net
+sudo dscacheutil -flushcache
+sudo killall -HUP mDNSResponder
+```
+
+The final working configuration retained WARP's `warp` mode, shown in the app as **Traffic and DNS (UDP)**. `tailscale set --accept-dns=false` prevents Tailscale from installing a competing default/supplemental DNS configuration. The `/etc/resolver` entry sends only names below the tailnet suffix to MagicDNS at `100.100.100.100`.
+
+Switching WARP to `tunnel_only` was useful as a diagnostic, but it disables WARP DNS and therefore does not meet this setup's goal.
 
 ## Validation
 
@@ -75,13 +89,15 @@ route -n get "$TAILSCALE_SUBNET_IP"
 Observed after the fix:
 
 - WARP: `Connected`, `Network: healthy`.
+- WARP's internal `connectivity-check.warp-svc.` name resolved through its local proxy; the 91% `CF_DNS_LOOKUP_FAILURE` did not return.
 - Internet trace: `warp=on`, `colo=SIN`.
 - Tailscale peer: repeated replies through `DERP(sin)`; observed latencies ranged from 6 to 125 ms.
 - MagicDNS: the peer name resolved to its expected Tailscale IPv4 address.
 - Subnet route: the tested private subnet still used Tailscale's `utun4` interface. Interface numbers are machine/session-specific.
-- The user confirmed the setup worked; both connections were left running.
+- A WARP disconnect/reconnect cycle completed successfully with both WARP and Tailscale still working.
+- Both connections were left running.
 
-Direct peer connectivity was not established in these checks. Subnet routing was inspected, but an application inside the subnet was not tested. Other relay regions, IPv6 transport, reboot persistence, and long-term stability were not validated.
+Direct peer connectivity was not established in these checks. Subnet routing was inspected, but an application inside the subnet was not tested. Other relay regions, IPv6 transport, reboot persistence, sleep/wake recovery, and long-term stability were not validated.
 
 ## Refresh relay exclusions
 
@@ -113,6 +129,10 @@ warp-cli tunnel ip remove 172.237.66.30
 warp-cli tunnel ip remove 172.237.72.79
 warp-cli tunnel ip remove 172.237.72.43
 warp-cli tunnel host remove controlplane.tailscale.com
+tailscale set --accept-dns=true
+sudo rm /etc/resolver/YOUR-TAILNET.ts.net
+sudo dscacheutil -flushcache
+sudo killall -HUP mDNSResponder
 ```
 
 If this restores the conflict, `warp-cli disconnect` returns to the tested Tailscale-only baseline. Changing either VPN can briefly interrupt active network sessions.
