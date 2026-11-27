@@ -8,10 +8,6 @@ BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 STATE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/handy-tools"
 
 ALL_TOOLS=(gitprune diskpurge)
-ALL_DESCS=(
-  "interactive git branch & worktree pruner"
-  "interactive cache & build-leftover purger"
-)
 
 if ! command -v go >/dev/null 2>&1; then
   echo "handy-tools: 'go' is required (https://go.dev/dl/)" >&2
@@ -60,10 +56,17 @@ short_sha() {
   printf '%.7s' "$1"
 }
 
-echo "Binary directory: $BIN_DIR"
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
+  PATH_COLOR=$'\033[34m'
+  PATH_RESET=$'\033[0m'
+else
+  PATH_COLOR=""
+  PATH_RESET=""
+fi
+printf '%sBinary directory: %s%s\n' "$PATH_COLOR" "$BIN_DIR" "$PATH_RESET"
 case ":$PATH:" in
-  *":$BIN_DIR:"*) echo "PATH: $BIN_DIR is available in this shell." ;;
-  *) echo "PATH: $BIN_DIR is not available in this shell." ;;
+  *":$BIN_DIR:"*) printf '%sPATH: available in this shell%s\n' "$PATH_COLOR" "$PATH_RESET" ;;
+  *) printf '%sPATH: not available in this shell%s\n' "$PATH_COLOR" "$PATH_RESET" ;;
 esac
 echo "Checking latest commit on $REF ..."
 REMOTE_SHA=$(resolve_remote_sha)
@@ -126,8 +129,7 @@ elif [ -r /dev/tty ] && [ -w /dev/tty ]; then
   C_BOLD=$'\033[1m'
   C_DIM=$'\033[2m'
   C_GREEN=$'\033[32m'
-  C_YELLOW=$'\033[33m'
-  C_CYAN=$'\033[36m'
+  C_REVERSE=$'\033[7m'
 
   cleanup_tty() {
     printf '\033[?25h' >"$TTY" 2>/dev/null || true
@@ -142,17 +144,16 @@ elif [ -r /dev/tty ] && [ -w /dev/tty ]; then
       "$C_BOLD" "$C_RESET" "$C_DIM" "$REF" "$REMOTE_SHORT" "$C_RESET" >"$TTY"
     for ((i = 0; i < N; i++)); do
       local ptr="  " box="[ ]" scol="$C_DIM"
-      if [ "$i" -eq "$cursor" ]; then ptr="${C_CYAN}> ${C_RESET}"; fi
+      if [ "$i" -eq "$cursor" ]; then ptr="> "; fi
       if [ "${SELECTED[$i]}" -eq 1 ]; then box="${C_GREEN}[x]${C_RESET}"; fi
       case "${STATUS_KIND[$i]}" in
-        new)     scol="$C_CYAN" ;;
-        update)  scol="$C_YELLOW" ;;
-        current) scol="$C_GREEN" ;;
+        update|current) scol="$C_GREEN" ;;
       esac
-      printf '\033[K%s%s %s%-10s%s  %s%-40s%s  %s%s%s\n' \
-        "$ptr" "$box" "$C_BOLD" "${ALL_TOOLS[$i]}" "$C_RESET" \
-        "$scol" "${STATUS_TEXT[$i]}" "$C_RESET" \
-        "$C_DIM" "${ALL_DESCS[$i]}" "$C_RESET" >"$TTY"
+      local highlight=""
+      if [ "$i" -eq "$cursor" ]; then highlight="$C_REVERSE"; fi
+      printf '\033[K%s%s %s%-10s%s  %s%s%s\n' \
+        "$ptr" "$box" "$highlight" "${ALL_TOOLS[$i]}" "$C_RESET" \
+        "$scol" "${STATUS_TEXT[$i]}" "$C_RESET" >"$TTY"
     done
     printf '\033[K\n' >"$TTY"
     printf '\033[K%sj/k or ↑/↓ move · space toggle · a all · n none · enter install · q quit%s\n' \
