@@ -46,3 +46,7 @@ whole thing with `./bazzite.sh`.
   quick skim (`curl -fsSL ... | less`) before running on a new box.
 - The SSH pubkey pull uses GitHub's `.keys` endpoint, which only ever
   exposes public keys — safe to use in a public repo.
+
+## Other tools
+
+- [`handy-tools/`](handy-tools/) — standalone Go TUIs (`gitprune`, `diskpurge`) with one-line install/uninstall scripts.
