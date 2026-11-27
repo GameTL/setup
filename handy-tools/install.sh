@@ -206,7 +206,7 @@ for tool in "${to_install[@]}"; do
 done
 
 echo "Installing (${to_install[*]}) @ $REMOTE_SHORT -> $BIN_DIR ..."
-GOPROXY="${HANDY_TOOLS_GOPROXY:-direct}" GOBIN="$BIN_DIR" go install "${targets[@]}"
+GOPROXY="${HANDY_TOOLS_GOPROXY:-direct}" GONOSUMDB="github.com/GameTL/setup" GOBIN="$BIN_DIR" go install "${targets[@]}"
 
 if [ -n "$REMOTE_SHA" ]; then
   for tool in "${to_install[@]}"; do
