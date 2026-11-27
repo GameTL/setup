@@ -77,22 +77,19 @@ STATUS_TEXT=()
 STATUS_KIND=() # new | update | current
 
 for ((i = 0; i < N; i++)); do
+  SELECTED[i]=0
   tool="${ALL_TOOLS[i]}"
   cur=$(installed_sha "$tool")
   if [ ! -x "$BIN_DIR/$tool" ]; then
-    SELECTED[i]=1
     STATUS_KIND[i]="new"
     STATUS_TEXT[i]="not installed -> $REMOTE_SHORT"
   elif [ -n "$REMOTE_SHA" ] && same_commit "$cur" "$REMOTE_SHA"; then
-    SELECTED[i]=0
     STATUS_KIND[i]="current"
     STATUS_TEXT[i]="up to date ($REMOTE_SHORT)"
   elif [ -n "$cur" ]; then
-    SELECTED[i]=1
     STATUS_KIND[i]="update"
     STATUS_TEXT[i]="update available ($(short_sha "$cur") -> $REMOTE_SHORT)"
   else
-    SELECTED[i]=1
     STATUS_KIND[i]="update"
     STATUS_TEXT[i]="installed (unknown commit) -> $REMOTE_SHORT"
   fi
@@ -194,7 +191,7 @@ for ((i = 0; i < N; i++)); do
 done
 
 if [ "${#to_install[@]}" -eq 0 ]; then
-  echo "Nothing selected. Already up to date!"
+  echo "Nothing selected."
   exit 0
 fi
 

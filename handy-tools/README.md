@@ -12,7 +12,7 @@ curl -fsSL https://raw.githubusercontent.com/GameTL/setup/main/handy-tools/insta
 
 What it does:
 1. Checks the latest commit on `main` against what you already have installed in `~/.local/bin` (`not installed`, `update available`, or `up to date`).
-2. Opens an interactive spacebar picker (new & outdated tools pre-selected; up-to-date tools unchecked).
+2. Opens an interactive spacebar picker (all tools unchecked by default).
 3. Installs selected tools to `~/.local/bin` and adds `~/.local/bin` to `PATH` in `~/.zshrc` (zsh) or `~/.bashrc` (bash) if needed.
 
 Skip the picker and install specific tools directly:
