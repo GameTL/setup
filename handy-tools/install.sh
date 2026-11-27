@@ -60,6 +60,11 @@ short_sha() {
   printf '%.7s' "$1"
 }
 
+echo "Binary directory: $BIN_DIR"
+case ":$PATH:" in
+  *":$BIN_DIR:"*) echo "PATH: $BIN_DIR is available in this shell." ;;
+  *) echo "PATH: $BIN_DIR is not available in this shell." ;;
+esac
 echo "Checking latest commit on $REF ..."
 REMOTE_SHA=$(resolve_remote_sha)
 if [ -n "$REMOTE_SHA" ]; then
@@ -220,6 +225,8 @@ if ! grep -qF '.local/bin' "$rc" 2>/dev/null; then
   # shellcheck disable=SC2016
   printf '\nexport PATH="$HOME/.local/bin:$PATH" # handy-tools\n' >> "$rc"
   echo "Added \$HOME/.local/bin to PATH in $rc"
+else
+  echo "Found a .local/bin reference in $rc; left it unchanged."
 fi
 
 echo "Done! Installed in $BIN_DIR:"
